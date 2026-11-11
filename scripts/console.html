@@ -1,0 +1,632 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>QQ 注入测试台</title>
+<style>
+  :root {
+    --bg: #f4f6fb;
+    --panel: #ffffff;
+    --line: #e4e8f1;
+    --text: #1e2430;
+    --muted: #7b849a;
+    --accent: #2f6fed;
+    --accent-weak: #eaf0ff;
+    --danger: #d64545;
+    --ok: #1f9d61;
+    --shadow: 0 8px 30px rgba(30, 45, 80, 0.08);
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 14px/1.5 -apple-system, "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+  }
+  button, input, textarea { font: inherit; }
+  .app { height: 100%; display: flex; flex-direction: column; }
+  header {
+    height: 58px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 18px;
+    background: var(--panel);
+    border-bottom: 1px solid var(--line);
+  }
+  .brand { font-weight: 700; letter-spacing: .2px; }
+  .brand small { font-weight: 500; color: var(--muted); margin-left: 8px; }
+  .self { margin-left: auto; display: flex; align-items: center; gap: 10px; color: var(--muted); }
+  .self b { color: var(--text); font-weight: 600; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #c3c9d6; display: inline-block; }
+  .dot.ok { background: var(--ok); box-shadow: 0 0 0 3px rgba(31,157,97,.12); }
+  .dot.bad { background: var(--danger); box-shadow: 0 0 0 3px rgba(214,69,69,.12); }
+  main { flex: 1; display: flex; min-height: 0; }
+  .sidebar {
+    width: 320px;
+    background: var(--panel);
+    border-right: 1px solid var(--line);
+    display: flex;
+    flex-direction: column;
+    min-height: 0;
+  }
+  .sidebar-top { padding: 12px; border-bottom: 1px solid var(--line); }
+  .search {
+    width: 100%;
+    border: 1px solid var(--line);
+    background: #f8faff;
+    border-radius: 10px;
+    padding: 9px 12px;
+    outline: none;
+  }
+  .search:focus { border-color: #b9ccff; background: #fff; }
+  .side-actions { display: flex; gap: 8px; margin-top: 8px; }
+  .ghost {
+    border: 1px solid var(--line);
+    background: #fff;
+    color: var(--muted);
+    border-radius: 8px;
+    padding: 5px 9px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .ghost:hover { border-color: #c8d5f5; color: var(--accent); }
+  .friends { flex: 1; overflow: auto; padding: 6px; }
+  .friend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 9px 10px;
+    border-radius: 10px;
+    cursor: pointer;
+    position: relative;
+  }
+  .friend:hover { background: #f5f8ff; }
+  .friend.active { background: var(--accent-weak); }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 10px; object-fit: cover;
+    background: #dfe6f7; flex: 0 0 38px;
+  }
+  .avatar-fallback {
+    width: 38px; height: 38px; border-radius: 10px; flex: 0 0 38px;
+    display: flex; align-items: center; justify-content: center;
+    color: #fff; font-weight: 700; background: #6f8fd8;
+  }
+  .friend-main { min-width: 0; flex: 1; }
+  .friend-name { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .friend-sub { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .badge {
+    position: absolute; right: 10px; top: 10px;
+    min-width: 18px; height: 18px; padding: 0 5px;
+    border-radius: 9px; background: var(--accent); color: #fff;
+    font-size: 11px; display: none; align-items: center; justify-content: center;
+  }
+  .badge.show { display: flex; }
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chat-head {
+    height: 58px; display: flex; align-items: center; gap: 12px;
+    padding: 0 18px; background: var(--panel); border-bottom: 1px solid var(--line);
+  }
+  .chat-head .friend-name { font-size: 15px; }
+  .chat-head .friend-sub { margin-top: 1px; }
+  .chat-head-actions { margin-left: auto; display: flex; gap: 8px; }
+  .messages { flex: 1; overflow: auto; padding: 18px 20px 8px; }
+  .empty {
+    height: 100%; display: flex; flex-direction: column; align-items: center;
+    justify-content: center; color: var(--muted); gap: 8px; text-align: center;
+  }
+  .empty h2 { margin: 0; font-size: 18px; color: var(--text); }
+  .msg { display: flex; flex-direction: column; margin-bottom: 14px; max-width: 72%; }
+  .msg.out { margin-left: auto; align-items: flex-end; }
+  .meta { font-size: 11px; color: var(--muted); margin: 0 2px 4px; }
+  .bubble {
+    padding: 9px 12px; border-radius: 12px; background: var(--panel);
+    border: 1px solid var(--line); box-shadow: 0 1px 1px rgba(20,40,80,.03);
+    white-space: pre-wrap; word-break: break-word;
+  }
+  .msg.out .bubble { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .msg.pending .bubble { opacity: .7; }
+  .msg.failed .bubble { background: #fff2f2; border-color: #f3c1c1; color: var(--danger); }
+  .composer {
+    padding: 12px 18px 16px; background: var(--panel); border-top: 1px solid var(--line);
+  }
+  .composer-row { display: flex; gap: 10px; align-items: flex-end; }
+  textarea {
+    flex: 1; resize: none; min-height: 42px; max-height: 140px;
+    border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px;
+    outline: none; background: #fbfcff;
+  }
+  textarea:focus { border-color: #b9ccff; background: #fff; }
+  .send {
+    border: 0; background: var(--accent); color: #fff; border-radius: 12px;
+    height: 42px; padding: 0 18px; cursor: pointer; font-weight: 600;
+  }
+  .send:hover { background: #255bd0; }
+  .send:disabled { background: #a9bbe4; cursor: default; }
+  .hint { color: var(--muted); font-size: 12px; margin-top: 8px; min-height: 18px; }
+  .hint.error { color: var(--danger); }
+  .toast {
+    position: fixed; right: 18px; top: 70px; z-index: 20;
+    background: #2a3142; color: #fff; padding: 9px 13px; border-radius: 10px;
+    font-size: 12px; opacity: 0; transform: translateY(-6px);
+    transition: opacity .18s, transform .18s; pointer-events: none; max-width: 360px;
+  }
+  .toast.show { opacity: 1; transform: translateY(0); }
+  .overlay {
+    position: fixed; inset: 0; background: rgba(20,30,50,.45);
+    display: none; align-items: center; justify-content: center; z-index: 30;
+  }
+  .overlay.show { display: flex; }
+  .token-card {
+    width: min(420px, 90vw); background: #fff; border-radius: 16px; padding: 22px;
+    box-shadow: var(--shadow);
+  }
+  .token-card h2 { margin: 0 0 6px; font-size: 18px; }
+  .token-card p { margin: 0 0 14px; color: var(--muted); font-size: 13px; }
+  .token-card input {
+    width: 100%; border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 12px; outline: none; margin-bottom: 12px;
+  }
+  .token-card button {
+    width: 100%; border: 0; background: var(--accent); color: #fff;
+    padding: 10px; border-radius: 10px; cursor: pointer; font-weight: 600;
+  }
+  @media (max-width: 760px) {
+    .sidebar { width: 100%; }
+    .chat { display: none; }
+    main.show-chat .sidebar { display: none; }
+    main.show-chat .chat { display: flex; }
+    .msg { max-width: 88%; }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <div class="brand">QQ 注入测试台 <small>好友私聊发送实验</small></div>
+    <div class="self">
+      <span id="connDot" class="dot"></span>
+      <span id="connText">连接中…</span>
+      <span id="selfText"></span>
+    </div>
+  </header>
+  <main id="main">
+    <aside class="sidebar">
+      <div class="sidebar-top">
+        <input id="search" class="search" placeholder="搜索昵称 / 备注 / QQ 号">
+        <div class="side-actions">
+          <button id="refreshFriends" class="ghost">刷新好友</button>
+          <button id="clearChat" class="ghost">清空消息</button>
+        </div>
+      </div>
+      <div id="friends" class="friends"></div>
+    </aside>
+    <section class="chat">
+      <div class="chat-head">
+        <div id="headAvatar"></div>
+        <div>
+          <div id="headName" class="friend-name">选择一位好友</div>
+          <div id="headSub" class="friend-sub">从左侧好友列表开始</div>
+        </div>
+        <div class="chat-head-actions">
+          <button id="backList" class="ghost" style="display:none">返回</button>
+        </div>
+      </div>
+      <div id="messages" class="messages">
+        <div class="empty">
+          <h2>还没有选择好友</h2>
+          <div>左侧列表来自 QQ 本地好友缓存，发送走 NT 内核接口。</div>
+        </div>
+      </div>
+      <div class="composer">
+        <div class="composer-row">
+          <textarea id="input" rows="1" placeholder="输入要发送的文本…" disabled></textarea>
+          <button id="send" class="send" disabled>发送</button>
+        </div>
+        <div id="hint" class="hint">Enter 发送，Shift + Enter 换行</div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<div id="tokenOverlay" class="overlay">
+  <div class="token-card">
+    <h2>需要访问令牌</h2>
+    <p>把 qqinject --console 输出的 URL 里的 token 粘贴到这里。令牌只保存在本机浏览器。</p>
+    <input id="tokenInput" placeholder="token">
+    <button id="tokenSave">使用这个令牌</button>
+  </div>
+</div>
+
+<script>
+(() => {
+  'use strict';
+  const params = new URLSearchParams(location.search);
+  let token = params.get('token') || localStorage.getItem('qqhook_console_token') || '';
+  let self = null;
+  let friends = [];
+  let selected = null;
+  let sse = null;
+  let sending = false;
+  const messages = new Map(); // friend.uid -> [{direction, text, time, status, ...}]
+  const unread = new Map();
+
+  const $ = (id) => document.getElementById(id);
+  const main = $('main');
+
+  if (token) {
+    localStorage.setItem('qqhook_console_token', token);
+  } else {
+    $('tokenOverlay').classList.add('show');
+  }
+
+  $('tokenSave').addEventListener('click', () => {
+    const value = $('tokenInput').value.trim();
+    if (!value) return;
+    localStorage.setItem('qqhook_console_token', value);
+    const url = new URL(location.href);
+    url.searchParams.set('token', value);
+    location.href = url.toString();
+  });
+
+  function toast(text) {
+    const el = $('toast');
+    el.textContent = text;
+    el.classList.add('show');
+    clearTimeout(toast.timer);
+    toast.timer = setTimeout(() => el.classList.remove('show'), 2600);
+  }
+
+  function fmtTime(ts) {
+    const date = new Date((Number(ts) || Math.floor(Date.now() / 1000)) * 1000);
+    return date.toLocaleTimeString('zh-CN', { hour12: false });
+  }
+
+  async function api(path, options) {
+    const opts = Object.assign({ method: 'GET' }, options || {});
+    opts.headers = Object.assign({
+      'X-Auth-Token': token
+    }, opts.body ? { 'Content-Type': 'application/json' } : {}, opts.headers || {});
+    const response = await fetch(path, opts);
+    let data = null;
+    try { data = await response.json(); } catch (e) { data = null; }
+    if (!response.ok || !data || data.ok === false) {
+      const message = (data && (data.error || data.warning)) || ('HTTP ' + response.status);
+      if (response.status === 401) {
+        $('tokenOverlay').classList.add('show');
+      }
+      throw new Error(message);
+    }
+    return data;
+  }
+
+  function avatarUrl(uin) {
+    return 'https://q1.qlogo.cn/g?b=qq&nk=' + encodeURIComponent(uin) + '&s=100';
+  }
+
+  function makeAvatar(friend, size) {
+    const wrap = document.createElement('div');
+    if (friend && friend.uin) {
+      const img = document.createElement('img');
+      img.className = 'avatar';
+      img.alt = '';
+      img.src = avatarUrl(friend.uin);
+      img.onerror = () => {
+        const fallback = document.createElement('div');
+        fallback.className = 'avatar-fallback';
+        fallback.textContent = (friend.display || '?').slice(0, 1).toUpperCase();
+        if (img.parentNode) img.parentNode.replaceChild(fallback, img);
+      };
+      wrap.appendChild(img);
+    } else {
+      const fallback = document.createElement('div');
+      fallback.className = 'avatar-fallback';
+      fallback.textContent = '?';
+      wrap.appendChild(fallback);
+    }
+    return wrap.firstElementChild;
+  }
+
+  function renderSelf() {
+    if (!self) return;
+    $('selfText').textContent = (self.nick || '当前账号') + (self.uin ? ' · ' + self.uin : '');
+  }
+
+  function renderFriends() {
+    const list = $('friends');
+    const query = $('search').value.trim().toLowerCase();
+    list.textContent = '';
+    const visible = friends.filter((friend) => {
+      if (!query) return true;
+      return (friend.display || '').toLowerCase().includes(query) ||
+        (friend.nick || '').toLowerCase().includes(query) ||
+        (friend.remark || '').toLowerCase().includes(query) ||
+        (friend.uin || '').includes(query);
+    });
+    if (!visible.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.style.height = '140px';
+      empty.textContent = friends.length ? '没有匹配的好友' : '好友列表为空';
+      list.appendChild(empty);
+      return;
+    }
+    for (const friend of visible) {
+      const item = document.createElement('div');
+      item.className = 'friend' + (selected && selected.uid === friend.uid ? ' active' : '');
+      item.appendChild(makeAvatar(friend));
+      const mainEl = document.createElement('div');
+      mainEl.className = 'friend-main';
+      const name = document.createElement('div');
+      name.className = 'friend-name';
+      name.textContent = friend.display || friend.uin;
+      const sub = document.createElement('div');
+      sub.className = 'friend-sub';
+      sub.textContent = (friend.remark ? friend.nick + ' · ' : '') + friend.uin;
+      mainEl.appendChild(name);
+      mainEl.appendChild(sub);
+      item.appendChild(mainEl);
+      const badge = document.createElement('span');
+      badge.className = 'badge' + (unread.get(friend.uid) ? ' show' : '');
+      badge.textContent = String(unread.get(friend.uid) || '');
+      item.appendChild(badge);
+      item.addEventListener('click', () => selectFriend(friend));
+      list.appendChild(item);
+    }
+  }
+
+  function selectFriend(friend) {
+    selected = friend;
+    unread.delete(friend.uid);
+    renderFriends();
+    $('headName').textContent = friend.display || friend.uin;
+    $('headSub').textContent = 'QQ ' + friend.uin + (friend.remark ? ' · 昵称 ' + friend.nick : '');
+    const headAvatar = $('headAvatar');
+    headAvatar.textContent = '';
+    headAvatar.appendChild(makeAvatar(friend));
+    $('input').disabled = false;
+    $('send').disabled = false;
+    $('input').focus();
+    if (window.innerWidth <= 760) main.classList.add('show-chat');
+    $('backList').style.display = window.innerWidth <= 760 ? 'inline-block' : 'none';
+    renderMessages();
+  }
+
+  function renderMessages() {
+    const box = $('messages');
+    box.textContent = '';
+    if (!selected) return;
+    const list = messages.get(selected.uid) || [];
+    if (!list.length) {
+      const empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<h2>' + escapeHtml(selected.display || selected.uin) + '</h2>' +
+        '<div>这轮测试还没有消息。发出第一条，或等对方回复。</div>';
+      box.appendChild(empty);
+      return;
+    }
+    for (const item of list) appendBubble(item);
+    box.scrollTop = box.scrollHeight;
+  }
+
+  function escapeHtml(text) {
+    return String(text).replace(/[&<>"']/g, (ch) => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[ch]);
+  }
+
+  function appendBubble(item) {
+    const box = $('messages');
+    const empty = box.querySelector('.empty');
+    if (empty) box.textContent = '';
+    const row = document.createElement('div');
+    row.className = 'msg ' + (item.direction === 'out' ? 'out' : 'in') +
+      (item.status === 'pending' ? ' pending' : '') +
+      (item.status === 'failed' ? ' failed' : '');
+    if (item.clientId) row.dataset.clientId = item.clientId;
+    const meta = document.createElement('div');
+    meta.className = 'meta';
+    meta.textContent = (item.direction === 'out' ? '我' : (item.sender || (selected && selected.display) || '对方')) +
+      ' · ' + fmtTime(item.time) +
+      (item.status === 'pending' ? ' · 发送中…' : '') +
+      (item.status === 'failed' ? ' · 失败' : '');
+    const bubble = document.createElement('div');
+    bubble.className = 'bubble';
+    bubble.textContent = item.text || '';
+    row.appendChild(meta);
+    row.appendChild(bubble);
+    box.appendChild(row);
+    box.scrollTop = box.scrollHeight;
+    return row;
+  }
+
+  function addMessage(friendUid, item) {
+    if (!messages.has(friendUid)) messages.set(friendUid, []);
+    messages.get(friendUid).push(item);
+    if (selected && selected.uid === friendUid) {
+      appendBubble(item);
+    } else if (item.direction === 'in') {
+      unread.set(friendUid, (unread.get(friendUid) || 0) + 1);
+      renderFriends();
+    }
+  }
+
+  function updatePending(clientId, patch) {
+    if (!selected) return;
+    const list = messages.get(selected.uid) || [];
+    const item = list.find((entry) => entry.clientId === clientId);
+    if (!item) return;
+    Object.assign(item, patch);
+    const box = $('messages');
+    const row = box.querySelector('.msg[data-client-id="' + clientId + '"]');
+    if (row) {
+      const replacement = document.createElement('div');
+      replacement.className = 'msg ' + (item.direction === 'out' ? 'out' : 'in') +
+        (item.status === 'pending' ? ' pending' : '') +
+        (item.status === 'failed' ? ' failed' : '');
+      if (item.clientId) replacement.dataset.clientId = item.clientId;
+      const meta = document.createElement('div');
+      meta.className = 'meta';
+      meta.textContent = (item.direction === 'out' ? '我' : (item.sender || '对方')) +
+        ' · ' + fmtTime(item.time) +
+        (item.status === 'pending' ? ' · 发送中…' : '') +
+        (item.status === 'failed' ? ' · 失败' : '') +
+        (item.status === 'sent' && item.messageId ? ' · ' + item.messageId : '');
+      const bubble = document.createElement('div');
+      bubble.className = 'bubble';
+      bubble.textContent = item.text || '';
+      replacement.appendChild(meta);
+      replacement.appendChild(bubble);
+      row.replaceWith(replacement);
+      box.scrollTop = box.scrollHeight;
+    }
+  }
+
+  function connectSse() {
+    if (sse) sse.close();
+    const url = '/api/events?token=' + encodeURIComponent(token);
+    sse = new EventSource(url);
+    sse.addEventListener('ready', () => setConnected(true));
+    sse.onopen = () => setConnected(true);
+    sse.onerror = () => setConnected(false);
+    sse.onmessage = (event) => {
+      let data = null;
+      try { data = JSON.parse(event.data); } catch (e) { return; }
+      if (!data) return;
+      if (data.type === 'message' && data.chat_type === 1) {
+        const friend = friends.find((entry) => entry.uin === data.peer_uin);
+        if (!friend) return;
+        if (data.direction === 'out') {
+          addMessage(friend.uid, {
+            direction: 'out', text: data.text, time: data.time,
+            status: 'sent', messageId: data.message_id
+          });
+        } else {
+          addMessage(friend.uid, {
+            direction: 'in', text: data.text, time: data.time,
+            sender: data.sender_name || friend.display, messageId: data.message_id
+          });
+        }
+      } else if (data.type === 'sent') {
+        updatePending(data.client_id, { status: 'sent', messageId: data.message_id });
+      } else if (data.type === 'notice') {
+        toast(data.message || '收到系统通知');
+      }
+    };
+  }
+
+  function setConnected(ok) {
+    $('connDot').className = 'dot ' + (ok ? 'ok' : 'bad');
+    $('connText').textContent = ok ? '已连接' : '连接断开，重连中…';
+  }
+
+  async function loadStatus() {
+    try {
+      const data = await api('/api/status');
+      self = data.self || null;
+      renderSelf();
+      setConnected(true);
+    } catch (error) {
+      setConnected(false);
+      if (!/unauthorized/.test(error.message)) toast(error.message);
+    }
+  }
+
+  async function loadFriends(force) {
+    try {
+      const data = await api('/api/friends' + (force ? '?refresh=1' : ''));
+      friends = data.friends || [];
+      if (data.self) {
+        self = data.self;
+        renderSelf();
+      }
+      renderFriends();
+      if (selected) {
+        const fresh = friends.find((entry) => entry.uid === selected.uid);
+        if (fresh) selectFriend(fresh);
+      }
+    } catch (error) {
+      toast('好友列表加载失败：' + error.message);
+    }
+  }
+
+  async function sendCurrent() {
+    if (!selected || sending) return;
+    const input = $('input');
+    const text = input.value;
+    if (!text.trim()) return;
+    sending = true;
+    $('send').disabled = true;
+    $('hint').classList.remove('error');
+    $('hint').textContent = '发送中…';
+    const clientId = 'local-' + Date.now() + '-' + Math.random().toString(16).slice(2, 8);
+    const time = Math.floor(Date.now() / 1000);
+    addMessage(selected.uid, {
+      direction: 'out', text: text, time: time, status: 'pending', clientId: clientId
+    });
+    input.value = '';
+    autoSize();
+
+    try {
+      const data = await api('/api/send', {
+        method: 'POST',
+        body: JSON.stringify({ uid: selected.uid, text: text })
+      });
+      const result = data.result || null;
+      const messageId = data.message_id || (result && result.msgId) || '';
+      updatePending(clientId, {
+        status: 'sent',
+        messageId: messageId,
+        time: Number(result && result.msgTime) || time
+      });
+      $('hint').textContent = data.confirmed
+        ? '已发送，消息 ID ' + messageId
+        : (data.warning || '已提交');
+    } catch (error) {
+      updatePending(clientId, { status: 'failed' });
+      $('hint').classList.add('error');
+      $('hint').textContent = '发送失败：' + error.message;
+      toast('发送失败：' + error.message);
+    } finally {
+      sending = false;
+      $('send').disabled = false;
+      input.focus();
+    }
+  }
+
+  function autoSize() {
+    const input = $('input');
+    input.style.height = 'auto';
+    input.style.height = Math.min(input.scrollHeight, 140) + 'px';
+  }
+
+  $('search').addEventListener('input', renderFriends);
+  $('refreshFriends').addEventListener('click', () => loadFriends(true));
+  $('clearChat').addEventListener('click', () => {
+    if (!selected) return;
+    messages.delete(selected.uid);
+    renderMessages();
+  });
+  $('send').addEventListener('click', sendCurrent);
+  $('input').addEventListener('input', autoSize);
+  $('input').addEventListener('keydown', (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendCurrent();
+    }
+  });
+  $('backList').addEventListener('click', () => {
+    main.classList.remove('show-chat');
+  });
+
+  renderSelf();
+  loadStatus().then(() => loadFriends(false));
+  connectSse();
+})();
+</script>
+</body>
+</html>

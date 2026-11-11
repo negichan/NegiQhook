@@ -1,0 +1,22 @@
+# QQ itself: the private client tree, the installer cache, and everything this
+# repo builds or bootstraps (qqinject.exe, appinit.dll, 7za.exe).
+bin/
+build/
+qqclient/
+
+# live traffic dumps and the cached login account
+qqproto/data/
+
+# MSVC intermediates, in case a build ever runs outside bin/
+*.obj
+*.pdb
+*.ilk
+*.exp
+*.lib
+*.res
+
+# scratch dumps and third-party copies used while researching
+.research/
+.tmp-research/
+node_modules/
+*.log

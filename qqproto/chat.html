@@ -1,0 +1,754 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>qqproto 聊天调试</title>
+<style>
+  :root {
+    --bg: #111720; --rail: #17202b; --panel: #1c2531; --panel2: #222c3a;
+    --line: #2b3746; --fg: #dbe3ec; --dim: #8695a8; --me: #2f6bd6; --other: #27313f;
+    --ok: #55c27a; --bad: #e56a6a; --warn: #d9a833; --mono: ui-monospace, Consolas, monospace;
+  }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0; background: var(--bg); color: var(--fg); overflow: hidden;
+    font: 14px/1.5 "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+    display: flex;
+  }
+  button, input, textarea { font: inherit; color: var(--fg); }
+
+  /* ---------------------------------------------------------------- rail */
+  .rail {
+    width: 60px; flex: 0 0 60px; background: var(--rail); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 0;
+  }
+  .rail button {
+    width: 42px; height: 42px; border: 0; border-radius: 8px; background: transparent;
+    color: var(--dim); cursor: pointer; font-size: 11px; line-height: 1.15; padding: 2px;
+  }
+  .rail button:hover { background: #223042; color: var(--fg); }
+  .rail button.active { background: #2a4266; color: #cfe3ff; }
+  .rail .spacer { flex: 1; }
+  .rail .lamp { width: 10px; height: 10px; border-radius: 50%; background: var(--bad); margin-bottom: 4px; }
+  .rail .lamp.on { background: var(--ok); }
+  .rail a { color: var(--dim); font-size: 11px; text-decoration: none; text-align: center; }
+  .rail a:hover { color: var(--fg); }
+
+  /* ---------------------------------------------------------------- list */
+  .list {
+    width: 272px; flex: 0 0 272px; background: var(--panel); border-right: 1px solid var(--line);
+    display: flex; flex-direction: column; min-height: 0;
+  }
+  .list .search { padding: 10px; border-bottom: 1px solid var(--line); }
+  .list .search input {
+    width: 100%; background: #131a24; border: 1px solid var(--line); border-radius: 6px; padding: 6px 9px;
+  }
+  .tabs { display: flex; border-bottom: 1px solid var(--line); }
+  .tabs button {
+    flex: 1; background: transparent; border: 0; padding: 8px 4px; color: var(--dim); cursor: pointer;
+    border-bottom: 2px solid transparent; font-size: 13px;
+  }
+  .tabs button.active { color: var(--fg); border-bottom-color: var(--me); }
+  .rows { overflow: auto; flex: 1; min-height: 0; }
+  .row {
+    display: flex; gap: 9px; padding: 9px 10px; cursor: pointer; border-bottom: 1px solid #1f2833;
+    align-items: center;
+  }
+  .row:hover { background: #222d3b; }
+  .row.active { background: #2a3a52; }
+  .row .who { flex: 1; min-width: 0; }
+  .row .name { font-size: 13.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .sub { color: var(--dim); font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .row .meta { text-align: right; color: var(--dim); font-size: 11px; flex: 0 0 auto; }
+  .badge {
+    display: inline-block; min-width: 18px; padding: 0 5px; border-radius: 9px; background: var(--bad);
+    color: #fff; font-size: 11px; text-align: center;
+  }
+  .avatar {
+    width: 38px; height: 38px; border-radius: 6px; flex: 0 0 38px; background: #33415a; color: #d7e6ff;
+    display: flex; align-items: center; justify-content: center; font-size: 15px; overflow: hidden;
+    position: relative;
+  }
+  .avatar img { width: 100%; height: 100%; object-fit: cover; }
+  .avatar.group { background: #2f5a7a; }
+  .group .avatar { background: #2f5a7a; }
+
+  /* ---------------------------------------------------------------- chat */
+  .chat { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+  .chat header {
+    padding: 10px 14px; border-bottom: 1px solid var(--line); background: var(--panel);
+    display: flex; align-items: center; gap: 10px;
+  }
+  .chat header .title { font-size: 15px; font-weight: 600; }
+  .chat header .id { color: var(--dim); font-size: 12px; font-family: var(--mono); }
+  .chat header .grow { flex: 1; }
+  .chat header button {
+    background: #202b38; border: 1px solid var(--line); border-radius: 6px; padding: 4px 9px;
+    font-size: 12px; cursor: pointer;
+  }
+  .chat header button:hover { border-color: var(--me); }
+  .banner {
+    padding: 6px 14px; background: #3a2a1c; color: #f0c48a; font-size: 12.5px;
+    border-bottom: 1px solid var(--line); display: none;
+  }
+  .banner.show { display: block; }
+  .msgs { flex: 1; overflow: auto; padding: 14px 16px 6px; min-height: 0; }
+  .day { text-align: center; color: var(--dim); font-size: 11.5px; margin: 10px 0 14px; }
+  .msg { display: flex; gap: 9px; margin-bottom: 12px; }
+  .msg.me { flex-direction: row-reverse; }
+  .msg .body { max-width: min(72%, 720px); min-width: 0; }
+  .msg .head { color: var(--dim); font-size: 11.5px; margin-bottom: 3px; }
+  .msg.me .head { text-align: right; }
+  .bubble {
+    background: var(--other); border-radius: 8px; padding: 7px 10px; word-break: break-word;
+    white-space: pre-wrap; position: relative;
+  }
+  .msg.me .bubble { background: var(--me); }
+  .bubble.pending { opacity: .55; }
+  .bubble.failed { background: #4b2a30; }
+  .bubble .time { color: rgba(255,255,255,.55); font-size: 10.5px; margin-top: 4px; text-align: right; font-family: var(--mono); }
+  .bubble img.media { max-width: 260px; max-height: 260px; border-radius: 5px; display: block; cursor: zoom-in; }
+  .seg-chip {
+    display: inline-block; background: #1a222c; border: 1px solid var(--line); border-radius: 5px;
+    padding: 1px 7px; margin: 2px 3px 2px 0; font-size: 12px; color: #b9c8da; font-family: var(--mono);
+  }
+  .at { color: #8cc2ff; }
+  .quote {
+    border-left: 2px solid #455772; padding: 2px 8px; margin-bottom: 5px; color: #a9bacd; font-size: 12.5px;
+    background: rgba(255,255,255,.04); border-radius: 0 5px 5px 0;
+  }
+  .recalled { text-align: center; color: var(--dim); font-size: 12px; margin: 6px 0 12px; }
+  .notice { text-align: center; color: var(--dim); font-size: 12px; margin: 6px 0 12px; }
+  .msg .avatar { width: 34px; height: 34px; flex: 0 0 34px; font-size: 13px; }
+  .empty { color: var(--dim); text-align: center; margin-top: 40px; font-size: 13px; }
+
+  /* ---------------------------------------------------------------- composer */
+  .composer { border-top: 1px solid var(--line); background: var(--panel); padding: 8px 12px 10px; }
+  .composer .tools { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin-bottom: 6px; }
+  .composer .tools input[type=text] {
+    flex: 1; min-width: 180px; background: #131a24; border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px;
+    font-family: var(--mono); font-size: 12px;
+  }
+  .composer .tools button {
+    background: #202b38; border: 1px solid var(--line); border-radius: 6px; padding: 5px 10px;
+    font-size: 12.5px; cursor: pointer;
+  }
+  .composer .tools button:hover { border-color: var(--me); }
+  .composer textarea {
+    width: 100%; min-height: 62px; resize: vertical; background: #131a24; border: 1px solid var(--line);
+    border-radius: 6px; padding: 7px 9px; outline: none;
+  }
+  .composer .bottom { display: flex; align-items: center; gap: 10px; margin-top: 7px; }
+  .composer .hint { color: var(--dim); font-size: 12px; flex: 1; }
+  .composer .send {
+    background: #2f6bd6; border: 1px solid #3f7de3; border-radius: 6px; padding: 6px 20px;
+    font-weight: 600; cursor: pointer;
+  }
+  .composer .send:disabled { background: #2a3543; border-color: var(--line); color: var(--dim); cursor: not-allowed; }
+  .switch { display: flex; align-items: center; gap: 6px; color: var(--dim); font-size: 12.5px; cursor: pointer; }
+  .switch input { width: auto; }
+  .switch.on { color: #f0c48a; }
+  .staged { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+  .staged .item {
+    display: flex; align-items: center; gap: 6px; background: #202b38; border: 1px solid var(--line);
+    border-radius: 6px; padding: 3px 6px; font-size: 12px;
+  }
+  .staged .item img { width: 26px; height: 26px; border-radius: 4px; object-fit: cover; }
+  .staged .item button { background: none; border: 0; color: var(--dim); cursor: pointer; padding: 0 2px; }
+
+  /* ---------------------------------------------------------------- members */
+  .members {
+    width: 208px; flex: 0 0 208px; background: var(--panel); border-left: 1px solid var(--line);
+    display: none; flex-direction: column; min-height: 0;
+  }
+  .members.show { display: flex; }
+  .members h3 { margin: 0; padding: 10px 12px; font-size: 12.5px; color: var(--dim); border-bottom: 1px solid var(--line); font-weight: 600; }
+  .members .rows { overflow: auto; }
+  .members .row { padding: 7px 10px; cursor: default; }
+  .members .row .avatar { width: 26px; height: 26px; flex: 0 0 26px; font-size: 11px; }
+  .members .row .sub { font-family: var(--mono); }
+</style>
+</head>
+<body>
+  <nav class="rail">
+    <div id="lamp" class="lamp" title="通信桥"></div>
+    <button id="tabChats" class="active">会话</button>
+    <button id="tabPeople">联系人</button>
+    <button id="tabMe">自己</button>
+    <div class="spacer"></div>
+    <a href="/" title="协议端调试台">调试<br>台</a>
+    <button id="reload" title="重新拉取会话与联系人">刷新</button>
+  </nav>
+
+  <aside class="list">
+    <div class="search"><input id="q" placeholder="搜索会话 / 群号 / 好友"></div>
+    <div class="tabs">
+      <button id="tabA" class="active">消息列表</button>
+      <button id="tabB">群组</button>
+      <button id="tabC">好友</button>
+    </div>
+    <div class="rows" id="rows"></div>
+  </aside>
+
+  <main class="chat">
+    <header>
+      <span class="title" id="title">选一个会话</span>
+      <span class="id" id="subtitle"></span>
+      <span class="grow"></span>
+      <button id="pull">拉取缓存历史</button>
+      <button id="toggleMembers">成员</button>
+    </header>
+    <div class="banner" id="banner"></div>
+    <div class="msgs" id="msgs"><div class="empty">左边选会话，或者等消息进来。<br>这里的“历史”只有本进程见到过的消息，不读 QQ 的数据库。</div></div>
+
+    <div class="composer">
+      <div class="tools">
+        <input type="text" id="imgPath" placeholder="本机图片绝对路径（只发已存在的文件，不下载、不用 base64）">
+        <button id="addImg">加为图片</button>
+      </div>
+      <div class="staged" id="staged"></div>
+      <textarea id="text" placeholder="输入消息，Enter 发送，Shift+Enter 换行"></textarea>
+      <div class="bottom">
+        <label class="switch" id="writeSwitch"><input type="checkbox" id="allowWrite"> 允许写操作（发送 / 撤回）</label>
+        <span class="hint" id="composerHint"></span>
+        <button class="send" id="sendBtn" disabled>发送</button>
+      </div>
+    </div>
+  </main>
+
+  <aside class="members" id="members">
+    <h3 id="membersTitle">群成员</h3>
+    <div class="rows" id="memberRows"></div>
+  </aside>
+
+<script>
+'use strict';
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s == null ? '' : s).replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+const avatarSrc = (uin) => uin ? `https://q1.qlogo.cn/g?b=qq&nk=${encodeURIComponent(uin)}&s=140` : '';
+const fileSrc = (p) => `/api/file?path=${encodeURIComponent(p)}`;
+
+const state = {
+  self: {}, chats: [], groups: [], friends: [],
+  active: '', activeKind: '', conv: new Map(), members: new Map(),
+  staged: [], pendingSeq: 0, tab: 'chats', pendingSends: []
+};
+
+function fmtTime(sec) {
+  const d = new Date(sec * 1000);
+  const now = new Date();
+  const sameDay = d.toDateString() === now.toDateString();
+  const hm = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return sameDay ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`;
+}
+
+function personName(msg) {
+  const s = msg.sender || {};
+  if (state.self && String(s.uin) === String(state.self.uin)) return state.self.nick || '我';
+  const friend = state.friends.find((f) => f.uin === String(s.uin));
+  return s.card || s.remark || s.nick || (friend && friend.display) || s.uin || '?';
+}
+
+function previewText(m) {
+  if (!m) return '';
+  if (m.deleted) return '[已撤回]';
+  const parts = [];
+  for (const seg of m.elements || []) {
+    if (seg.type === 'text') parts.push(String(seg.data && seg.data.text || '').replace(/\s+/g, ' '));
+    else if (seg.type === 'at') parts.push('@' + ((seg.data && (seg.data.name || seg.data.qq)) || ''));
+    else parts.push('[' + seg.type + ']');
+  }
+  return (parts.join(' ') || m.raw || '').trim().slice(0, 40);
+}
+
+function renderSegments(m) {
+  const out = [];
+  for (const seg of m.elements || []) {
+    const d = seg.data || {};
+    if (seg.type === 'text') {
+      out.push(`<span>${esc(d.text || '')}</span>`);
+    } else if (seg.type === 'at') {
+      const who = String(d.qq || d.id || '');
+      const mine = state.self && String(who) === String(state.self.uin);
+      out.push(`<span class="at${mine ? ' me-at' : ''}">@${esc(d.name || who)}</span>`);
+    } else if (seg.type === 'image') {
+      const src = d.path ? fileSrc(d.path) : (d.url || '');
+      const note = d.path ? `${d.thumb ? '缩略图 ' : ''}${d.file_size ? Math.round(d.file_size / 1024) + 'KB ' : ''}` : '';
+      out.push(src
+        ? `<img class="media" src="${esc(src)}" alt="图片" title="${esc(d.path || d.url || d.file || '')}" onerror="this.insertAdjacentHTML('beforebegin','<span class=&quot;seg-chip&quot;>图片取不到 ${esc(d.file || '')}</span>');this.remove();">`
+        : `<span class="seg-chip">图片 ${esc(d.file || d.md5 || '')}</span>`);
+      if (note || d.summary) out.push(`<span class="seg-chip">${esc((note + (d.summary || '')).trim())}</span>`);
+    } else if (seg.type === 'reply') {
+      out.push(`<div class="quote">回复 ${esc(d.sender_uin || '')}: ${esc(d.text || '')}</div>`);
+    } else if (seg.type === 'face') {
+      out.push(`<span class="seg-chip">[表情 ${esc(d.text || d.id || '')}]</span>`);
+    } else if (seg.type === 'mface') {
+      out.push(`<span class="seg-chip">[动画表情 ${esc(d.name || d.id || '')}]</span>`);
+    } else if (seg.type === 'record') {
+      out.push(`<span class="seg-chip">[语音 ${esc(d.duration || 0)}s${d.text ? ' · ' + esc(String(d.text).slice(0, 40)) : ''}]</span>`);
+    } else if (seg.type === 'video') {
+      out.push(`<span class="seg-chip">[视频 ${esc(d.file || '')} ${esc(d.duration || 0)}s]</span>`);
+    } else if (seg.type === 'file') {
+      out.push(`<span class="seg-chip">[文件 ${esc(d.name || '')} ${d.size ? Math.round(d.size / 1024) + 'KB' : ''}]</span>`);
+    } else if (seg.type === 'forward') {
+      out.push(`<span class="seg-chip">[合并转发 ${esc(d.id || '')}]</span>`);
+    } else if (seg.type === 'json') {
+      out.push(`<span class="seg-chip">[JSON ${esc(String(d.text || '').slice(0, 60))}]</span>`);
+    } else if (seg.type === 'gray_tip') {
+      out.push('<span class="seg-chip">[系统提示]</span>');
+    } else {
+      out.push(`<span class="seg-chip">[${esc(seg.type)} ${esc(Object.keys(d).slice(0, 4).join(','))}]</span>`);
+    }
+  }
+  if (!out.length && m.raw) out.push(`<span>${esc(m.raw)}</span>`);
+  return out.join('');
+}
+
+function messageNode(m) {
+  const wrap = document.createElement('div');
+  if (m.notice) {
+    wrap.className = 'notice';
+    wrap.textContent = `${fmtTime(m.time)} · ${m.notice}`;
+    return wrap;
+  }
+  if (m.deleted) {
+    wrap.className = 'recalled';
+    wrap.textContent = `${m.mine ? '你' : personName(m)} 撤回了一条消息 · ${fmtTime(m.time)}`;
+    wrap.dataset.id = m.id;
+    return wrap;
+  }
+  wrap.className = 'msg' + (m.mine ? ' me' : '');
+  wrap.dataset.id = m.id;
+  const uin = m.mine ? state.self.uin : (m.sender && m.sender.uin);
+  const img = avatarSrc(uin);
+  const initials = esc(String(uin || '?').slice(-2));
+  const head = m.kind === 'group' && !m.mine
+    ? `<div class="head">${esc(personName(m))}</div>` : '';
+  const stateClass = m.pending ? ' pending' : (m.failed ? ' failed' : '');
+  const errLine = m.failed ? `<div class="time">${esc(m.error || '发送失败')}</div>` : '';
+  wrap.innerHTML =
+    `<div class="avatar" title="${esc(uin || '')}">${img ? `<img src="${esc(img)}" onerror="this.remove()">` : ''}<span>${initials}</span></div>` +
+    `<div class="body">${head}<div class="bubble${stateClass}">${renderSegments(m)}<div class="time">${fmtTime(m.time)}</div>${errLine}</div></div>`;
+  if (m.mine && !m.pending && m.id && !String(m.id).startsWith('p')) {
+    wrap.querySelector('.bubble').oncontextmenu = (ev) => { ev.preventDefault(); recall(m); };
+  }
+  const media = wrap.querySelector('img.media');
+  if (media) media.onclick = () => window.open(media.src, '_blank');
+  return wrap;
+}
+
+function bucket(channel) {
+  if (!state.conv.has(channel)) state.conv.set(channel, []);
+  return state.conv.get(channel);
+}
+
+function appendMessage(m, scroll) {
+  const list = bucket(m.channel);
+  // the pending bubble is replaced by the real outgoing echo from the kernel
+  if (!String(m.id).startsWith('p')) {
+    const dup = list.findIndex((x) => x.id === m.id);
+    if (dup !== -1) { list[dup] = m; repaint(m.channel === state.active, scroll); return; }
+    // The echo's message id is the kernel's, so it cannot match the local id.
+    // Match on content + channel within the window instead, or the same message
+    // shows up twice as soon as the API answer arrives first.
+    if (m.mine) {
+      const key = previewText(m);
+      const now = Date.now();
+      state.pendingSends = state.pendingSends.filter((p) => p.until > now - 30000);
+      const at = state.pendingSends.findIndex((p) => p.channel === m.channel && p.key === key);
+      if (at !== -1) {
+        const drop = state.pendingSends.splice(at, 1)[0];
+        const index = list.findIndex((x) => x.id === drop.id);
+        if (index !== -1) list.splice(index, 1);
+      }
+    }
+  }
+  list.push(m);
+  if (list.length > 400) list.splice(0, list.length - 400);
+  if (m.channel === state.active) repaint(true, scroll);
+  const chat = state.chats.find((c) => c.channel === m.channel);
+  if (chat) {
+    chat.last = m;
+    chat.count++;
+    if (!m.mine && m.channel !== state.active) chat.unread++;
+    renderRows();
+  } else if (m.channel) {
+    loadChats(true);
+  }
+}
+
+function repaint(maybeScroll, force) {
+  const box = $('msgs');
+  const channel = state.active;
+  if (!channel) return;
+  const atBottom = box.scrollHeight - box.scrollTop - box.clientHeight < 80;
+  const list = bucket(channel);
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">这个会话在本进程里还没有消息。<br>点「拉取缓存历史」看看缓存，或让对方发一条。</div>';
+    return;
+  }
+  let lastDay = '';
+  let lastTime = 0;
+  for (const m of list) {
+    const day = new Date(m.time * 1000).toDateString();
+    if (day !== lastDay) {
+      const d = document.createElement('div');
+      d.className = 'day';
+      d.textContent = new Date(m.time * 1000).toLocaleString('zh-CN', { month: 'long', day: 'numeric', weekday: 'short' });
+      box.appendChild(d);
+      lastDay = day;
+      lastTime = 0;
+    } else if (m.time - lastTime > 300) {
+      const d = document.createElement('div');
+      d.className = 'day';
+      d.textContent = fmtTime(m.time);
+      box.appendChild(d);
+    }
+    lastTime = m.time;
+    box.appendChild(messageNode(m));
+  }
+  if (force !== false && (atBottom || maybeScroll === true)) box.scrollTop = box.scrollHeight;
+}
+
+// ---------------------------------------------------------------- list panel
+function avatarHtml(kind, id) {
+  const img = avatarSrc(id);
+  return `<div class="avatar${kind === 'group' ? ' group' : ''}">` +
+    (img && kind !== 'group' ? `<img src="${esc(img)}" onerror="this.remove()">` : '') +
+    `<span>${esc(String(id || '?').slice(-2))}</span></div>`;
+}
+
+function renderRows() {
+  const word = $('q').value.trim().toLowerCase();
+  const box = $('rows');
+  box.innerHTML = '';
+  const items = [];
+  if (state.tab === 'chats') {
+    for (const chat of state.chats) {
+      items.push({
+        key: chat.channel, kind: chat.kind, id: chat.channel,
+        name: chat.name || chat.channel,
+        sub: previewText(chat.last),
+        meta: chat.last ? fmtTime(chat.last.time) : '',
+        unread: chat.unread
+      });
+    }
+  } else if (state.tab === 'groups') {
+    for (const g of state.groups) {
+      items.push({ key: g.id, kind: 'group', id: g.id, name: g.name || g.id, sub: '群号 ' + g.id, meta: g.member_count ? g.member_count + ' 人' : '' });
+    }
+  } else {
+    for (const f of state.friends) {
+      items.push({
+        key: f.uin, kind: 'private', id: f.uin,
+        name: f.display || f.nick || f.uin,
+        sub: (f.remark && f.remark !== f.nick ? '备注 ' + f.remark + ' · ' : '') + 'QQ ' + f.uin + (f.provisional ? ' · 仅见过面' : ''),
+        meta: ''
+      });
+    }
+  }
+  const filtered = word
+    ? items.filter((it) => (`${it.name} ${it.id} ${it.sub}`).toLowerCase().includes(word))
+    : items;
+  if (!filtered.length) {
+    box.innerHTML = `<div class="empty">${word ? '没有匹配项' : '这里还是空的'}</div>`;
+    return;
+  }
+  for (const it of filtered) {
+    const div = document.createElement('div');
+    div.className = 'row' + (it.key === state.active ? ' active' : '') + (it.kind === 'group' ? ' group' : '');
+    div.innerHTML = avatarHtml(it.kind, it.id) +
+      `<div class="who"><div class="name">${esc(it.name)}</div><div class="sub">${esc(it.sub)}</div></div>` +
+      `<div class="meta">${esc(it.meta)}${it.unread ? `<br><span class="badge">${it.unread}</span>` : ''}</div>`;
+    div.onclick = () => openConversation(it.key);
+    box.appendChild(div);
+  }
+}
+
+// ---------------------------------------------------------------- data
+async function apiGet(path) {
+  const res = await fetch(path);
+  return res.json();
+}
+async function apiPost(path, body) {
+  const res = await fetch(path, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'X-Debug-Call': '1' },
+    body: JSON.stringify(body)
+  });
+  return res.json();
+}
+
+async function loadChats(quiet) {
+  try {
+    const data = await apiGet('/api/chats');
+    state.self = data.self || {};
+    state.groups = data.groups || [];
+    state.friends = data.friends || [];
+    const previous = new Map(state.chats.map((c) => [c.channel, c]));
+    state.chats = (data.chats || []).map((c) => ({
+      ...c,
+      unread: (previous.get(c.channel) || {}).unread === undefined ? c.unread : previous.get(c.channel).unread,
+      last: (previous.get(c.channel) && previous.get(c.channel).last &&
+        previous.get(c.channel).last.time > (c.last && c.last.time || 0)) ? previous.get(c.channel).last : c.last
+    }));
+    for (const [channel, list] of state.conv) {
+      const chat = state.chats.find((c) => c.channel === channel);
+      if (chat && list.length) chat.last = list[list.length - 1];
+    }
+    $('subtitle').textContent = `${state.self.uin || ''} ${state.self.nick || ''}`.trim();
+    renderRows();
+    if (!quiet) setBanner(data.bridgeConnected ? '' : '通信桥没连上：QQ 侧没起来，或端口不对。发送会失败。');
+    else if (data.bridgeConnected) setBanner('');
+  } catch (e) {
+    if (!quiet) setBanner('拿不到会话：' + e.message);
+  }
+}
+
+function setBanner(text) {
+  $('banner').textContent = text;
+  $('banner').classList.toggle('show', !!text);
+}
+
+async function openConversation(channel) {
+  state.active = String(channel);
+  const chat = state.chats.find((c) => c.channel === state.active);
+  if (chat) chat.unread = 0;
+  $('title').textContent = (chat && chat.name) || displayNameFromLists(state.active);
+  renderRows();
+  $('msgs').innerHTML = '<div class="empty">加载中…</div>';
+  let conv;
+  try {
+    conv = await apiGet(`/api/conversation?channel=${encodeURIComponent(state.active)}&limit=100`);
+  } catch (e) {
+    $('msgs').innerHTML = `<div class="empty">加载失败：${esc(e.message)}</div>`;
+    return;
+  }
+  state.conv.set(state.active, conv.messages || []);
+  state.activeKind = conv.kind;
+  if (conv.members && conv.members.length) state.members.set(state.active, conv.members);
+  $('title').textContent = conv.name || conv.channel;
+  $('msgs').innerHTML = (conv.messages || []).length ? '' : '<div class="empty">缓存里没有这个会话的消息。</div>';
+  repaint(true, false);
+  renderMembers();
+}
+
+function displayNameFromLists(id) {
+  const group = state.groups.find((g) => g.id === String(id));
+  if (group) return group.name || id;
+  const friend = state.friends.find((f) => f.uin === String(id));
+  if (friend) return friend.display || friend.nick || id;
+  const chat = state.chats.find((c) => c.channel === String(id));
+  return (chat && chat.name) || id;
+}
+
+async function pullHistory() {
+  if (!state.active) return;
+  const conv = await apiGet(`/api/conversation?channel=${encodeURIComponent(state.active)}&limit=100`);
+  state.conv.set(state.active, conv.messages || []);
+  repaint(true, false);
+}
+
+function renderMembers() {
+  const list = state.members.get(state.active) || [];
+  $('membersTitle').textContent = `群成员 ${list.length ? '(' + list.length + ')' : ''}`;
+  const box = $('memberRows');
+  box.innerHTML = '';
+  if (!list.length) {
+    box.innerHTML = '<div class="empty">还没取到成员。群里来一条消息或稍后再刷新。</div>';
+    return;
+  }
+  for (const m of list) {
+    const div = document.createElement('div');
+    div.className = 'row';
+    div.innerHTML = avatarHtml('private', m.uin) +
+      `<div class="who"><div class="name">${esc(m.card || m.nick || m.uin)}</div>` +
+      `<div class="sub">${esc(m.uin)}${m.role ? ' · ' + esc(m.role) : ''}</div></div>`;
+    div.onclick = () => {
+      $('text').value += `@${m.card || m.nick || m.uin} `;
+      $('text').focus();
+    };
+    box.appendChild(div);
+  }
+}
+
+// ---------------------------------------------------------------- send
+function segmentsToSend() {
+  const segments = [];
+  const text = $('text').value;
+  for (const item of state.staged) segments.push({ type: 'image', data: { file: item.path } });
+  if (text) segments.push({ type: 'text', data: { text } });
+  return segments;
+}
+
+function renderStaged() {
+  const box = $('staged');
+  box.innerHTML = '';
+  state.staged.forEach((item, index) => {
+    const div = document.createElement('div');
+    div.className = 'item';
+    div.innerHTML = `<img src="${esc(fileSrc(item.path))}" onerror="this.style.display='none'">` +
+      `<span title="${esc(item.path)}">${esc(item.path.split(/[\\/]/).pop())}</span>` +
+      `<button title="移除">×</button>`;
+    div.querySelector('button').onclick = () => { state.staged.splice(index, 1); renderStaged(); };
+    box.appendChild(div);
+  });
+}
+
+async function send() {
+  if (!state.active) { setBanner('先选一个会话。'); return; }
+  const segments = segmentsToSend();
+  if (!segments.length) return;
+  const pendingId = 'p' + (++state.pendingSeq);
+  const mine = {
+    id: pendingId, channel: state.active,
+    kind: state.activeKind || (state.chats.find((c) => c.channel === state.active) || {}).kind || 'private',
+    time: Math.floor(Date.now() / 1000), mine: true, pending: true,
+    sender: { uin: String(state.self.uin || '') },
+    elements: segments, raw: ''
+  };
+  appendMessage(mine, true);
+  state.pendingSends.push({
+    channel: state.active, key: previewText(mine), id: pendingId, until: Date.now() + 120000
+  });
+  $('text').value = '';
+  state.staged = [];
+  renderStaged();
+  const result = await apiPost('/api/chat/send', {
+    channel: state.active, segments, allow_write: true
+  });
+  const list = bucket(state.active);
+  const entry = list.find((x) => x.id === pendingId);
+  if (result.ok) {
+    if (entry) {
+      entry.pending = false;
+      entry.time = Number(result.data && result.data.time) || entry.time;
+    }
+    setBanner('');
+  } else {
+    if (entry) { entry.pending = false; entry.failed = true; entry.error = result.error || '失败'; }
+    setBanner('发送失败：' + (result.error || '未知错误'));
+  }
+  repaint(true, false);
+}
+
+async function recall(m) {
+  if (!confirm(`撤回这条消息？\n\n${previewText(m)}`)) return;
+  const result = await apiPost('/api/chat/recall', {
+    channel: state.active, message_id: m.id, allow_write: true
+  });
+  if (result.ok) {
+    m.deleted = true;
+    repaint(true, false);
+    setBanner('');
+  } else {
+    setBanner('撤回失败：' + (result.error || '未知错误'));
+  }
+}
+
+// ---------------------------------------------------------------- events
+function connect() {
+  const es = new EventSource('/api/stream');
+  es.addEventListener('hello', (e) => {
+    const data = JSON.parse(e.data);
+    $('lamp').className = 'lamp' + (data.bridgeConnected ? ' on' : '');
+    if (data.self) state.self = Object.assign({}, state.self, data.self);
+  });
+  es.addEventListener('ev', (e) => {
+    const rec = JSON.parse(e.data);
+    if (rec.kind !== 'kernel') return;
+    const raw = rec.data || {};
+    if (rec.chatMessage) {
+      appendMessage(rec.chatMessage, true);
+      return;
+    }
+    if (raw.type === 'message_deleted' && raw.message_id) {
+      for (const [channel, list] of state.conv) {
+        const hit = list.find((x) => x.id === String(raw.message_id));
+        if (hit) { hit.deleted = true; if (channel === state.active) repaint(true, false); }
+      }
+      return;
+    }
+    if (raw.type === 'offline') {
+      $('lamp').className = 'lamp';
+      setBanner('QQ 侧离线了（offline 事件）。');
+      return;
+    }
+    // other notices: show them in the conversation they belong to, as a gray line
+    if (raw.group_id || raw.peer_uin) {
+      const channel = String(raw.is_group ? raw.group_id : (raw.peer_uin || raw.user_id || ''));
+      if (channel && state.conv.has(channel)) {
+        bucket(channel).push({
+          id: 'n' + (++state.pendingSeq), channel, kind: raw.is_group ? 'group' : 'private',
+          time: Number(raw.time) || Math.floor(Date.now() / 1000), mine: false,
+          notice: `${raw.type}${raw.sub_type ? '/' + raw.sub_type : ''}`, elements: [], raw: ''
+        });
+        if (channel === state.active) repaint(true);
+      }
+    }
+  });
+  es.addEventListener('call', (e) => {
+    const rec = JSON.parse(e.data);
+    if (rec.protocol === 'chat' && rec.kind === 'recall' && rec.ok) {
+      const id = String((rec.params && rec.params.message_id) || '');
+      for (const [channel, list] of state.conv) {
+        const hit = list.find((x) => x.id === id);
+        if (hit) { hit.deleted = true; if (channel === state.active) repaint(true, false); }
+      }
+    }
+  });
+  setInterval(async () => {
+    try {
+      const snap = await apiGet('/api/snapshot');
+      $('lamp').className = 'lamp' + (snap.bridgeConnected ? ' on' : '');
+      const sendReady = state.active && $('allowWrite').checked && snap.bridgeConnected;
+      $('sendBtn').disabled = !sendReady;
+      $('composerHint').textContent = !snap.bridgeConnected ? '桥没连上，不能发'
+        : (!state.active ? '先选会话'
+        : (!$('allowWrite').checked ? '勾「允许写操作」才能发' : 'Enter 发送 · 右键自己的气泡撤回'));
+      if (!snap.bridgeConnected) setBanner('通信桥没连上：发送会失败。');
+      else if (!state.active) setBanner('');
+    } catch (e) { /* the endpoint is restarting */ }
+  }, 3000);
+}
+
+// ---------------------------------------------------------------- wiring
+$('tabChats').onclick = () => { state.tab = 'chats'; $('tabA').classList.add('active'); $('tabB').classList.remove('active'); $('tabC').classList.remove('active'); renderRows(); };
+$('tabPeople').onclick = () => { state.tab = 'groups'; $('tabB').classList.add('active'); $('tabA').classList.remove('active'); $('tabC').classList.remove('active'); renderRows(); };
+$('tabMe').onclick = () => { state.tab = 'friends'; $('tabC').classList.add('active'); $('tabA').classList.remove('active'); $('tabB').classList.remove('active'); renderRows(); };
+$('tabA').onclick = () => { state.tab = 'chats'; $('tabChats').click(); };
+$('tabB').onclick = () => { state.tab = 'groups'; $('tabPeople').click(); };
+$('tabC').onclick = () => { state.tab = 'friends'; $('tabMe').click(); };
+$('reload').onclick = () => { if (state.active) openConversation(state.active); loadChats(); };
+$('q').oninput = renderRows;
+$('pull').onclick = pullHistory;
+$('toggleMembers').onclick = () => $('members').classList.toggle('show');
+$('allowWrite').onchange = () => {
+  $('writeSwitch').classList.toggle('on', $('allowWrite').checked);
+  $('sendBtn').disabled = !($('allowWrite').checked && state.active);
+  if ($('allowWrite').checked) {
+    setBanner('写操作已开：这里的发送/撤回会真的进 QQ，只用自有账号和自有群，出现风控信号（result=121 之类）就停手。');
+  } else setBanner('');
+};
+$('addImg').onclick = () => {
+  const path = $('imgPath').value.trim();
+  if (!path) return;
+  state.staged.push({ path });
+  $('imgPath').value = '';
+  renderStaged();
+};
+$('imgPath').onkeydown = (e) => { if (e.key === 'Enter') { e.preventDefault(); $('addImg').click(); } };
+$('text').onkeydown = (e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!$('sendBtn').disabled) send(); } };
+$('sendBtn').onclick = send;
+
+(async function start() {
+  await loadChats();
+  connect();
+  $('composerHint').textContent = '先选会话';
+})();
+</script>
+</body>
+</html>

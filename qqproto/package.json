@@ -1,0 +1,14 @@
+{
+  "name": "qqproto",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Standalone protocol endpoint for the qq-hook-poc bridge",
+  "main": "index.js",
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node index.js"
+  }
+}

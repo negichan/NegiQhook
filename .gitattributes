@@ -1,0 +1,12 @@
+# cmd.exe misparses these files when they are checked out with LF endings, so
+# the batch entry points always ship as CRLF no matter who clones them.
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.exe binary
+*.dll binary
+*.7z binary
+*.node binary

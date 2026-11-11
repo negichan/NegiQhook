@@ -1,0 +1,2815 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "qqproto · Satori API",
+    "version": "1.0.0",
+    "description": "QQNT 注入桥的独立协议端，Satori 面。HTTP 默认 `--port 5140`（副本实例 5141），WebSocket 事件在 `ws /v1/events`。\n\n本文件覆盖 @satorijs/protocol 1.7.0 的 37 个方法：**30 个可用**，**7 个返回 501 并带原因**。\n\nHTTP：`POST /v1/{method}`，JSON body 就是参数；`GET /v1/{method}?参数` 也行。成功直接返回方法结果，失败用 HTTP 状态码（400/401/403/404/501/500）+ `{message}`。\n\nWS：连接 `/v1/events`，IDENTIFY（op 3）携带 `{token, sn}`；READY（op 4）回 `{logins, proxy_urls}`；事件帧 op 0，心跳 op 1/2。详细事件类型见 HANDBOOK 的 Satori 一节。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。\n\n由 scripts/gen_api_docs.js 生成；改接口先改脚本里的表，再重新生成。"
+  },
+  "servers": [
+    {
+      "url": "http://127.0.0.1:5141",
+      "description": "副本实例（qq_start.bat 默认，--protocol satori|both）"
+    },
+    {
+      "url": "http://127.0.0.1:5140",
+      "description": "独立协议端默认端口"
+    }
+  ],
+  "tags": [
+    {
+      "name": "登录",
+      "description": "login.get / user.get"
+    },
+    {
+      "name": "好友",
+      "description": "好友列表、删除、申请审批"
+    },
+    {
+      "name": "群组",
+      "description": "群列表、群信息、加群审批"
+    },
+    {
+      "name": "群成员",
+      "description": "成员查询、踢人、禁言、角色"
+    },
+    {
+      "name": "频道",
+      "description": "频道查询与群名、全员禁言"
+    },
+    {
+      "name": "消息",
+      "description": "发送、查询、缓存历史、撤回"
+    },
+    {
+      "name": "互动",
+      "description": "消息表情回应"
+    },
+    {
+      "name": "上传",
+      "description": "multipart 文件上传（落盘后回 file://）"
+    },
+    {
+      "name": "状态 · 已实现",
+      "description": "有真实实现；权限不足等运行时错误按 403/404 返回"
+    },
+    {
+      "name": "状态 · 未实现",
+      "description": "返回 HTTP 501 和原因"
+    }
+  ],
+  "security": [
+    {
+      "bearerAuth": []
+    },
+    {
+      "tokenQuery": []
+    }
+  ],
+  "paths": {
+    "/v1/login.get": {
+      "post": {
+        "tags": [
+          "登录",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ login.get · 登录信息与能力表",
+        "description": "**状态：已实现**\n\n客户端一般先 GET /v1/login.get 验 token 与能力表。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_login.get",
+        "x-apifox-folder": "登录",
+        "x-apifox-status": "released",
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "sn": 1,
+                      "adapter": "qq-hook",
+                      "platform": "qq",
+                      "status": 1,
+                      "features": [
+                        "login.get",
+                        "user.get",
+                        "friend.list",
+                        "message.create",
+                        "upload.create"
+                      ],
+                      "user": {
+                        "id": "10000001",
+                        "name": "测试账号",
+                        "nick": "测试账号",
+                        "avatar": "https://q1.qlogo.cn/g?b=qq&nk=10000001&s=640"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/user.get": {
+      "post": {
+        "tags": [
+          "登录",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ user.get · 取用户资料",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_user.get",
+        "x-apifox-folder": "登录",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号或 uid",
+                    "example": "10000002"
+                  },
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号，便于在群成员缓存里找"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "id": "10000002",
+                      "name": "测试好友",
+                      "nick": "测试好友",
+                      "avatar": "https://q1.qlogo.cn/g?b=qq&nk=10000002&s=640"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/friend.list": {
+      "post": {
+        "tags": [
+          "好友",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ friend.list · 好友列表",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_friend.list",
+        "x-apifox-folder": "好友",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "next": {
+                    "type": "string",
+                    "description": "翻页游标"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "user": {
+                            "id": "10000002",
+                            "name": "测试好友",
+                            "nick": "测试好友"
+                          },
+                          "nick": "测试好友"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/friend.delete": {
+      "post": {
+        "tags": [
+          "好友",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ friend.delete · 删除好友",
+        "description": "**状态：已实现**\n\n危险写操作。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_friend.delete",
+        "x-apifox-folder": "好友",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/friend.approve": {
+      "post": {
+        "tags": [
+          "好友",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ friend.approve · 处理好友申请",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_friend.approve",
+        "x-apifox-folder": "好友",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "申请的 flag",
+                    "example": "req-1"
+                  },
+                  "approve": {
+                    "type": "boolean",
+                    "description": "默认 true"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "拒绝理由"
+                  }
+                },
+                "required": [
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.list": {
+      "post": {
+        "tags": [
+          "群组",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.list · 群列表",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.list",
+        "x-apifox-folder": "群组",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "next": {
+                    "type": "string",
+                    "description": "翻页游标"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "123456789",
+                          "name": "测试群"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.get": {
+      "post": {
+        "tags": [
+          "群组",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.get · 群信息",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.get",
+        "x-apifox-folder": "群组",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  }
+                },
+                "required": [
+                  "guild_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "id": "123456789",
+                      "name": "测试群"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.approve": {
+      "post": {
+        "tags": [
+          "群组",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.approve · 处理加群申请",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.approve",
+        "x-apifox-folder": "群组",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "申请的 flag",
+                    "example": "seq-1"
+                  },
+                  "approve": {
+                    "type": "boolean",
+                    "description": "默认 true"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "拒绝理由"
+                  }
+                },
+                "required": [
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.approve": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.approve · 处理加群申请（成员维度）",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.approve",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "申请的 flag",
+                    "example": "seq-1"
+                  },
+                  "approve": {
+                    "type": "boolean",
+                    "description": "默认 true"
+                  },
+                  "comment": {
+                    "type": "string",
+                    "description": "拒绝理由"
+                  }
+                },
+                "required": [
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.list": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.list · 群成员列表",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.list",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "next": {
+                    "type": "string",
+                    "description": "翻页游标"
+                  }
+                },
+                "required": [
+                  "guild_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "user": {
+                            "id": "10000002",
+                            "name": "测试好友"
+                          },
+                          "name": "测试好友",
+                          "nick": "测试好友",
+                          "roles": []
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.get": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.get · 单个群成员",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.get",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号或 uid",
+                    "example": "10000002"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "user": {
+                        "id": "10000002",
+                        "name": "测试好友"
+                      },
+                      "name": "测试好友",
+                      "nick": "测试好友",
+                      "roles": [
+                        {
+                          "id": "member",
+                          "name": "member"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.kick": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.kick · 踢人",
+        "description": "**状态：已实现**\n\n危险写操作。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.kick",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  },
+                  "permanent": {
+                    "type": "boolean",
+                    "description": "同时拒绝再次加群"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.mute": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.mute · 禁言",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.mute",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "description": "秒数；0 解除禁言"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.role.set": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.role.set · 设管理员",
+        "description": "**状态：已实现**\n\nQQ 只有 owner/admin/member 三种角色。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.role.set",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  },
+                  "role_id": {
+                    "type": "string",
+                    "description": "只接受 admin / 3；member 会被拒",
+                    "example": "admin"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id",
+                  "role_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.role.unset": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.role.unset · 取消管理员",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.role.unset",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  },
+                  "role_id": {
+                    "type": "string",
+                    "description": "admin / member",
+                    "example": "admin"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id",
+                  "role_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.member.role.list": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.member.role.list · 成员角色",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.member.role.list",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "member"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/guild.role.list": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ guild.role.list · 角色表",
+        "description": "**状态：已实现**\n\nQQ 没有角色表，这是内置的三个固定角色。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.role.list",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  }
+                },
+                "required": [
+                  "guild_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "owner",
+                          "name": "群主",
+                          "color": 0
+                        },
+                        {
+                          "id": "admin",
+                          "name": "管理员",
+                          "color": 0
+                        },
+                        {
+                          "id": "member",
+                          "name": "成员",
+                          "color": 0
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/channel.get": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ channel.get · 取频道",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.get",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "群号或好友 QQ",
+                    "example": "123456789"
+                  },
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号"
+                  }
+                },
+                "required": [
+                  "channel_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "id": "123456789",
+                      "type": 0,
+                      "name": "测试群"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/channel.list": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ channel.list · 群内频道列表",
+        "description": "**状态：已实现**\n\nQQ 一个群只有一个文本频道。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.list",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  }
+                },
+                "required": [
+                  "guild_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "123456789",
+                          "type": 0,
+                          "name": "测试群"
+                        }
+                      ]
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/user.channel.create": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ user.channel.create · 私聊频道",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_user.channel.create",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "user_id": {
+                    "type": "string",
+                    "description": "QQ 号",
+                    "example": "10000002"
+                  }
+                },
+                "required": [
+                  "user_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "id": "10000002",
+                      "type": 1
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/channel.update": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ channel.update · 改群名",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.update",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "群号",
+                    "example": "123456789"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "至少给 data.name",
+                    "example": {
+                      "name": "新群名"
+                    }
+                  }
+                },
+                "required": [
+                  "channel_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/channel.mute": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ channel.mute · 全员禁言",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.mute",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "群号（也认 guild_id）",
+                    "example": "123456789"
+                  },
+                  "enable": {
+                    "type": "boolean",
+                    "description": "true 开启"
+                  },
+                  "duration": {
+                    "type": "integer",
+                    "description": "NoneBot 适配器用 duration；0 表示解禁"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/message.create": {
+      "post": {
+        "tags": [
+          "消息",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ message.create · 发送消息",
+        "description": "**状态：已实现**\n\n只支持 text / at / img（本机路径）/ emoji / quote；record、video、file 会回 501。content 就是 @satorijs/element 的 toString()：`<at id=\"123\"/> hi`、`<img src=\"D:/a.png\"/>`。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_message.create",
+        "x-apifox-folder": "消息",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "群号或好友 QQ",
+                    "example": "123456789"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "消息内容（内层片段文本：纯文本原样，媒体/at 用标签）",
+                    "example": "help"
+                  },
+                  "referrer": {
+                    "type": "string",
+                    "description": "引用消息 id（对象形式取 .id）"
+                  }
+                },
+                "required": [
+                  "channel_id",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": [
+                      {
+                        "id": "7701602212777096975",
+                        "channel": {
+                          "id": "123456789",
+                          "type": 0,
+                          "name": "测试群"
+                        },
+                        "guild": {
+                          "id": "123456789",
+                          "name": "测试群"
+                        },
+                        "user": {
+                          "id": "10000001",
+                          "name": "测试账号"
+                        },
+                        "content": "ok",
+                        "timestamp": 1793169000000
+                      }
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/message.get": {
+      "post": {
+        "tags": [
+          "消息",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ message.get · 取消息",
+        "description": "**状态：已实现**\n\n只能取本进程启动后见过的消息。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_message.get",
+        "x-apifox-folder": "消息",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "会话 id",
+                    "example": "123456789"
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id",
+                    "example": "7701602212777096975"
+                  }
+                },
+                "required": [
+                  "channel_id",
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "id": "7701602212777096975",
+                      "channel": {
+                        "id": "123456789",
+                        "type": 0
+                      },
+                      "user": {
+                        "id": "10000002",
+                        "name": "测试好友"
+                      },
+                      "content": "hello",
+                      "timestamp": 1793169000000,
+                      "created_at": 1793169000000
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/message.list": {
+      "post": {
+        "tags": [
+          "消息",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ message.list · 会话消息（缓存）",
+        "description": "**状态：已实现**\n\n只来自内存缓存，重启即空。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_message.list",
+        "x-apifox-folder": "消息",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "会话 id",
+                    "example": "123456789"
+                  },
+                  "limit": {
+                    "type": "integer",
+                    "description": "每页条数，默认 50，上限 200"
+                  },
+                  "next": {
+                    "type": "string",
+                    "description": "翻页游标"
+                  },
+                  "order": {
+                    "type": "string",
+                    "description": "asc | desc"
+                  },
+                  "direction": {
+                    "type": "string",
+                    "description": "before | after，未给 order 时决定排序"
+                  }
+                },
+                "required": [
+                  "channel_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": {
+                      "data": [
+                        {
+                          "id": "7701602212777096975",
+                          "channel": {
+                            "id": "123456789",
+                            "type": 0
+                          },
+                          "content": "hello",
+                          "timestamp": 1793169000000
+                        }
+                      ],
+                      "next": "50"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/message.delete": {
+      "post": {
+        "tags": [
+          "消息",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ message.delete · 撤回消息",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_message.delete",
+        "x-apifox-folder": "消息",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "会话 id",
+                    "example": "123456789"
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id",
+                    "example": "7701602212777096975"
+                  }
+                },
+                "required": [
+                  "channel_id",
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/reaction.create": {
+      "post": {
+        "tags": [
+          "互动",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ reaction.create · 贴表情",
+        "description": "**状态：已实现**\n\nQQ 每条消息每个账号只有一个表情位。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_reaction.create",
+        "x-apifox-folder": "互动",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id",
+                    "example": "7701602212777096975"
+                  },
+                  "emoji_id": {
+                    "type": "string",
+                    "description": "QQ 表情 id",
+                    "example": "76"
+                  }
+                },
+                "required": [
+                  "message_id",
+                  "emoji_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/reaction.delete": {
+      "post": {
+        "tags": [
+          "互动",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ reaction.delete · 撤销表情",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_reaction.delete",
+        "x-apifox-folder": "互动",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id",
+                    "example": "7701602212777096975"
+                  },
+                  "emoji_id": {
+                    "type": "string",
+                    "description": "QQ 表情 id",
+                    "example": "76"
+                  }
+                },
+                "required": [
+                  "message_id",
+                  "emoji_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/reaction.clear": {
+      "post": {
+        "tags": [
+          "互动",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ reaction.clear · 清空表情",
+        "description": "**状态：已实现**\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_reaction.clear",
+        "x-apifox-folder": "互动",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id",
+                    "example": "7701602212777096975"
+                  },
+                  "emoji_id": {
+                    "type": "string",
+                    "description": "QQ 表情 id",
+                    "example": "76"
+                  }
+                },
+                "required": [
+                  "message_id",
+                  "emoji_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": null
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/upload.create": {
+      "post": {
+        "tags": [
+          "上传",
+          "状态 · 已实现"
+        ],
+        "summary": "✅ upload.create · 上传文件",
+        "description": "**状态：已实现**\n\nbody 必须是 multipart/form-data；落盘到 qqproto/data/upload，回 file:// 路径，不下载远程内容。\n\n返回 HTTP 200 + 方法返回值本身（没有 OneBot 那种信封）。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_upload.create",
+        "x-apifox-folder": "上传",
+        "x-apifox-status": "released",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "files": {
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "format": "binary"
+                    },
+                    "description": "一个或多个文件（上限 8 个 / 32MB）"
+                  }
+                },
+                "required": [
+                  "files"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "方法返回值（对象/数组/null）",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "description": "返回值本身（对象/数组/字符串或 null）"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "示例",
+                    "value": [
+                      "file:///D:/qq-hook-poc/qqproto/data/upload/8c1f.png"
+                    ]
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/SatoriBadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "403": {
+            "$ref": "#/components/responses/SatoriForbidden"
+          },
+          "404": {
+            "$ref": "#/components/responses/SatoriNotFound"
+          },
+          "501": {
+            "$ref": "#/components/responses/SatoriNotImplemented"
+          }
+        }
+      }
+    },
+    "/v1/message.update": {
+      "post": {
+        "tags": [
+          "消息",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · message.update · 编辑消息",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：QQ 内核没有改消息 API。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_message.update",
+        "x-apifox-folder": "消息",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "会话 id"
+                  },
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id"
+                  },
+                  "content": {
+                    "type": "string",
+                    "description": "新内容"
+                  }
+                },
+                "required": [
+                  "channel_id",
+                  "message_id",
+                  "content"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "message.update is not supported by the QQ adapter: QQ 内核没有改消息 API。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/reaction.list": {
+      "post": {
+        "tags": [
+          "互动",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · reaction.list · 表情列表",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：QQ 能设置表情，但不能列出谁贴了什么。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_reaction.list",
+        "x-apifox-folder": "互动",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "message_id": {
+                    "type": "string",
+                    "description": "消息 id"
+                  }
+                },
+                "required": [
+                  "message_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "reaction.list is not supported by the QQ adapter: QQ 能设置表情，但不能列出谁贴了什么。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channel.create": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · channel.create · 建群/建频道",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：内核服务不暴露建群；建群/退群在本项目里是手动操作。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.create",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号"
+                  },
+                  "data": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "频道信息"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "channel.create is not supported by the QQ adapter: 内核服务不暴露建群；建群/退群在本项目里是手动操作。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/channel.delete": {
+      "post": {
+        "tags": [
+          "频道",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · channel.delete · 退群/解散",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：退群/解散被刻意做成了手动操作。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_channel.delete",
+        "x-apifox-folder": "频道",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "channel_id": {
+                    "type": "string",
+                    "description": "群号"
+                  }
+                },
+                "required": [
+                  "channel_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "channel.delete is not supported by the QQ adapter: 退群/解散被刻意做成了手动操作。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/guild.role.create": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · guild.role.create · 新建角色",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：QQ 角色固定为 owner/admin/member，不是可编辑的角色表。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.role.create",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号"
+                  },
+                  "role": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "角色定义"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "guild.role.create is not supported by the QQ adapter: QQ 角色固定为 owner/admin/member，不是可编辑的角色表。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/guild.role.update": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · guild.role.update · 修改角色",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：QQ 角色固定为 owner/admin/member，不是可编辑的角色表。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.role.update",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号"
+                  },
+                  "role_id": {
+                    "type": "string",
+                    "description": "角色 id"
+                  },
+                  "role": {
+                    "type": "object",
+                    "additionalProperties": true,
+                    "description": "角色定义"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "role_id",
+                  "role"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "guild.role.update is not supported by the QQ adapter: QQ 角色固定为 owner/admin/member，不是可编辑的角色表。"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/guild.role.delete": {
+      "post": {
+        "tags": [
+          "群成员",
+          "状态 · 未实现"
+        ],
+        "summary": "⚠️ 未实现 · guild.role.delete · 删除角色",
+        "description": "**状态：未实现**\n\n返回 HTTP 501 和 `{\"message\": \"...\"}`；原因：QQ 角色固定为 owner/admin/member，不是可编辑的角色表。\n\n参数放 JSON body（POST）或 query（GET）；multipart 例外见 upload.create。\n\n鉴权：`Authorization: Bearer <token>` 或 `?access_token=<token>`（HTTP 与 WebSocket 都认）。",
+        "operationId": "satori_guild.role.delete",
+        "x-apifox-folder": "群成员",
+        "x-apifox-status": "designing",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "guild_id": {
+                    "type": "string",
+                    "description": "群号"
+                  },
+                  "role_id": {
+                    "type": "string",
+                    "description": "角色 id"
+                  }
+                },
+                "required": [
+                  "guild_id",
+                  "role_id"
+                ]
+              }
+            }
+          }
+        },
+        "responses": {
+          "401": {
+            "$ref": "#/components/responses/SatoriUnauthorized"
+          },
+          "501": {
+            "description": "未实现，带原因",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SatoriError"
+                },
+                "example": {
+                  "message": "guild.role.delete is not supported by the QQ adapter: QQ 角色固定为 owner/admin/member，不是可编辑的角色表。"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer"
+      },
+      "tokenQuery": {
+        "type": "apiKey",
+        "in": "query",
+        "name": "access_token"
+      }
+    },
+    "schemas": {
+      "SatoriError": {
+        "type": "object",
+        "properties": {
+          "message": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "responses": {
+      "SatoriBadRequest": {
+        "description": "参数错误",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SatoriError"
+            },
+            "example": {
+              "message": "channel_id is required"
+            }
+          }
+        }
+      },
+      "SatoriUnauthorized": {
+        "description": "token 不对",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SatoriError"
+            },
+            "example": {
+              "message": "unauthorized"
+            }
+          }
+        }
+      },
+      "SatoriForbidden": {
+        "description": "权限不足（权限词、result=120101005 等）",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SatoriError"
+            },
+            "example": {
+              "message": "only the owner can do this"
+            }
+          }
+        }
+      },
+      "SatoriNotFound": {
+        "description": "找不到（用户/成员/消息）",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SatoriError"
+            },
+            "example": {
+              "message": "user not found"
+            }
+          }
+        }
+      },
+      "SatoriNotImplemented": {
+        "description": "明确未实现",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/SatoriError"
+            },
+            "example": {
+              "message": "message.update is not supported by the QQ adapter: QQ has no edit-message API in this kernel build"
+            }
+          }
+        }
+      }
+    }
+  }
+}
