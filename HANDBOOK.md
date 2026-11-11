@@ -98,8 +98,8 @@ src/hook/dllmain.cpp         被注入的 DLL：管道、诊断、V8 执行、uv
 src/injector/main.cpp        注入器：找进程、注入、命令、--listen / --bridge-only / --launch / --headless
 src/boot/dllmain.cpp         无头启动 DLL：内存重定向 package.json/app.main.js，启动后自卸载
 src/headless/app.main.js     无头主程序：驱动 wrapper/session 登录并装桥，不建任何窗口
-src/boottest/main.cpp        离线靶子：验重定向与注入后才加载模块的补丁/还原
-src/testhost/main.cpp        无害测试目标（含托盘钩子探针）
+src/boottest/main.cpp        离线靶子（开发树，不在本仓库）：验重定向与注入后才加载模块的补丁/还原
+src/testhost/main.cpp        无害测试目标（开发树，不在本仓库；含托盘钩子探针）
 scripts/headless_launch.js   启动器：无头（默认）或有头（--headed），拉起 QQ、ready 后起协议端并监督它
 scripts/lib/line_editor.js   控制台自己的行编辑：原始模式、宽字符光标、历史、Tab，日志插在中间也不打乱输入
 scripts/lib/server_console.js  控制台框架：命令注册表、help、颜色、状态行、未知命令与失败的形状
@@ -176,7 +176,7 @@ build.bat
 build_boot.bat
 ```
 
-`build.bat` 输出 `bin\qqhook.dll`、`bin\qqinject.exe`、`bin\testhost.exe`。`build_boot.bat` 输出 `bin\headless\appinit.dll` 和两个离线靶子：`bin\boottest.exe`、`bin\boottest\QQNT.dll`（后者故意和真模块同名，用来验「注入后才加载的模块也会被重定向」）。
+`build.bat` 输出 `bin\qqhook.dll`、`bin\qqinject.exe`；`build_boot.bat` 输出 `bin\headless\appinit.dll`。开发树里另有两个离线靶子 `bin\boottest.exe`、`bin\boottest\QQNT.dll`（后者故意和真模块同名，用来验「注入后才加载的模块也会被重定向」），它们和对应源码不随本仓库发布。
 
 `.bat` 有两条格式约定，`.gitattributes` 已经把它们钉住了：**必须 CRLF**（LF 版 cmd.exe 会连行都读错），**里面只能有 ASCII**——cmd.exe 按系统 ANSI 码页（本机 936）解析批处理文件，UTF-8 的中文行会被配成半个字符，剩下的字节里就冒出了 `|`、`^` 这类控制符，一句 `echo` 会被拆成几条"不是内部或外部命令"。所以 `qq_start.bat` 自己只印英文，中文提示都由 `scripts\headless_launch.js` 打（那是 Node，读的是 UTF-8）。
 
